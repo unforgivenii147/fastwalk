@@ -1,0 +1,16 @@
+[package]
+name = "fastwalk"
+version = "0.3.6"
+edition = "2021"
+
+[lib]
+name = "fastwalk"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module"] }
+jwalk = "0.8.1"
+
+[profile.release]
+lto = true
+codegen-units = 1

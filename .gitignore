@@ -1,0 +1,16 @@
+*.env
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+credential.json
+.venv/
+.venv*/
+venv/
+venv*/
+ENV/
+env/
+build/
+dist/
+*.dll
+*.dylib
