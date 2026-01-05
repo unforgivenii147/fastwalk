@@ -5,11 +5,6 @@ __pycache__/
 *$py.class
 credential.json
 .venv/
-.venv*/
-venv/
-venv*/
-ENV/
-env/
 build/
 dist/
 *.dll

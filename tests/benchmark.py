@@ -53,6 +53,7 @@ def benchmark_walk_with_metadata(path: str = SAMPLE_DIR):
 
     return results
 
+
 def benchmark_walk_parallel(path: str = SAMPLE_DIR):
     """Benchmark parallel walk function"""
     print(f'\nBenchmarking walk_parallel on: {path}')
@@ -146,5 +147,3 @@ Benchmark complete!
 ============================================================
 
 """
-
-
