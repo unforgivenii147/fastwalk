@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use std::path::PathBuf;
 
 #[pyfunction]
-fn walk(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> {
+fn walk(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
     let follow = follow_links.unwrap_or(false);
 
     let walker = jwalk::WalkDir::new(&path).follow_links(follow);
@@ -13,7 +13,7 @@ fn walk(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> {
     for entry in walker {
         match entry {
             Ok(e) => {
-                results.push(e.path().to_string_lossy().to_string());
+                results.push(e.path());
             }
             Err(e) => {
                 return Err(PyOSError::new_err(format!(
@@ -29,7 +29,7 @@ fn walk(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> {
 
 /// Walk a directory and return only files (not directories)
 #[pyfunction]
-fn walk_files(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> {
+fn walk_files(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
     let follow = follow_links.unwrap_or(false);
 
     let walker = jwalk::WalkDir::new(&path).follow_links(follow);
@@ -40,7 +40,7 @@ fn walk_files(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>>
         match entry {
             Ok(e) => {
                 if e.file_type().is_file() {
-                    results.push(e.path().to_string_lossy().to_string());
+                    results.push(e.path());
                 }
             }
             Err(e) => {
@@ -57,7 +57,7 @@ fn walk_files(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>>
 
 /// Walk a directory and return only directories
 #[pyfunction]
-fn walk_dirs(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> {
+fn walk_dirs(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
     let follow = follow_links.unwrap_or(false);
 
     let walker = jwalk::WalkDir::new(&path).follow_links(follow);
@@ -68,7 +68,7 @@ fn walk_dirs(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> 
         match entry {
             Ok(e) => {
                 if e.file_type().is_dir() {
-                    results.push(e.path().to_string_lossy().to_string());
+                    results.push(e.path());
                 }
             }
             Err(e) => {
@@ -88,7 +88,7 @@ fn walk_dirs(path: String, follow_links: Option<bool>) -> PyResult<Vec<String>> 
 #[derive(Clone)]
 struct Entry {
     #[pyo3(get)]
-    path: String,
+    path: PathBuf,
     #[pyo3(get)]
     is_file: bool,
     #[pyo3(get)]
@@ -102,7 +102,7 @@ struct Entry {
 /// Walk a directory and return Entry objects with metadata
 #[pyfunction]
 fn walk_with_metadata(
-    path: String,
+    path: PathBuf,
     follow_links: Option<bool>,
     max_depth: Option<usize>,
     min_depth: Option<usize>,
@@ -126,7 +126,7 @@ fn walk_with_metadata(
             Ok(e) => {
                 let file_type = e.file_type();
                 results.push(Entry {
-                    path: e.path().to_string_lossy().to_string(),
+                    path: e.path(),
                     is_file: file_type.is_file(),
                     is_dir: file_type.is_dir(),
                     is_symlink: file_type.is_symlink(),
@@ -148,10 +148,10 @@ fn walk_with_metadata(
 /// Parallel walk for better performance on large directories
 #[pyfunction]
 fn walk_parallel(
-    path: String,
+    path: PathBuf,
     follow_links: Option<bool>,
     num_threads: Option<usize>,
-) -> PyResult<Vec<String>> {
+) -> PyResult<Vec<PathBuf>> {
     let follow = follow_links.unwrap_or(false);
     let threads = num_threads.unwrap_or(0); // 0 = auto
 
@@ -164,7 +164,7 @@ fn walk_parallel(
     for entry in walker {
         match entry {
             Ok(e) => {
-                results.push(e.path().to_string_lossy().to_string());
+                results.push(e.path());
             }
             Err(e) => {
                 return Err(PyOSError::new_err(format!(
