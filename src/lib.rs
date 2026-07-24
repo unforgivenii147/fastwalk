@@ -1,19 +1,23 @@
 use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
+use pyo3::types::PyAny;
 use std::path::PathBuf;
 
+fn to_py_path<'py>(py: Python<'py>, path: PathBuf) -> PyResult<&'py PyAny> {
+    let pathlib = py.import("pathlib")?;
+    pathlib.call_method1("Path", (path,))
+}
+
 #[pyfunction]
-fn walk(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
+fn walk(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
-
     let walker = jwalk::WalkDir::new(&path).follow_links(follow);
-
     let mut results = Vec::new();
 
     for entry in walker {
         match entry {
             Ok(e) => {
-                results.push(e.path());
+                results.push(to_py_path(py, e.path())?);
             }
             Err(e) => {
                 return Err(PyOSError::new_err(format!(
@@ -23,24 +27,20 @@ fn walk(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
             }
         }
     }
-
     Ok(results)
 }
 
-/// Walk a directory and return only files (not directories)
 #[pyfunction]
-fn walk_files(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
+fn walk_files(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
-
     let walker = jwalk::WalkDir::new(&path).follow_links(follow);
-
     let mut results = Vec::new();
 
     for entry in walker {
         match entry {
             Ok(e) => {
                 if e.file_type().is_file() {
-                    results.push(e.path());
+                    results.push(to_py_path(py, e.path())?);
                 }
             }
             Err(e) => {
@@ -51,24 +51,20 @@ fn walk_files(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf
             }
         }
     }
-
     Ok(results)
 }
 
-/// Walk a directory and return only directories
 #[pyfunction]
-fn walk_dirs(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>> {
+fn walk_dirs(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
-
     let walker = jwalk::WalkDir::new(&path).follow_links(follow);
-
     let mut results = Vec::new();
 
     for entry in walker {
         match entry {
             Ok(e) => {
                 if e.file_type().is_dir() {
-                    results.push(e.path());
+                    results.push(to_py_path(py, e.path())?);
                 }
             }
             Err(e) => {
@@ -79,16 +75,14 @@ fn walk_dirs(path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<PathBuf>
             }
         }
     }
-
     Ok(results)
 }
 
-/// Entry information with metadata
 #[pyclass]
 #[derive(Clone)]
 struct Entry {
     #[pyo3(get)]
-    path: PathBuf,
+    path: Py<PyAny>,
     #[pyo3(get)]
     is_file: bool,
     #[pyo3(get)]
@@ -99,22 +93,20 @@ struct Entry {
     depth: usize,
 }
 
-/// Walk a directory and return Entry objects with metadata
 #[pyfunction]
 fn walk_with_metadata(
+    py: Python<'_>,
     path: PathBuf,
     follow_links: Option<bool>,
     max_depth: Option<usize>,
     min_depth: Option<usize>,
 ) -> PyResult<Vec<Entry>> {
     let follow = follow_links.unwrap_or(false);
-
     let mut walker = jwalk::WalkDir::new(&path).follow_links(follow);
 
     if let Some(max) = max_depth {
         walker = walker.max_depth(max);
     }
-
     if let Some(min) = min_depth {
         walker = walker.min_depth(min);
     }
@@ -125,8 +117,9 @@ fn walk_with_metadata(
         match entry {
             Ok(e) => {
                 let file_type = e.file_type();
+                let py_path = to_py_path(py, e.path())?.into(); // Convert reference to a persistent Py object
                 results.push(Entry {
-                    path: e.path(),
+                    path: py_path,
                     is_file: file_type.is_file(),
                     is_dir: file_type.is_dir(),
                     is_symlink: file_type.is_symlink(),
@@ -141,17 +134,16 @@ fn walk_with_metadata(
             }
         }
     }
-
     Ok(results)
 }
 
-/// Parallel walk for better performance on large directories
 #[pyfunction]
 fn walk_parallel(
+    py: Python<'_>,
     path: PathBuf,
     follow_links: Option<bool>,
     num_threads: Option<usize>,
-) -> PyResult<Vec<PathBuf>> {
+) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
     let threads = num_threads.unwrap_or(0); // 0 = auto
 
@@ -164,7 +156,7 @@ fn walk_parallel(
     for entry in walker {
         match entry {
             Ok(e) => {
-                results.push(e.path());
+                results.push(to_py_path(py, e.path())?);
             }
             Err(e) => {
                 return Err(PyOSError::new_err(format!(
@@ -174,11 +166,9 @@ fn walk_parallel(
             }
         }
     }
-
     Ok(results)
 }
 
-/// A Python module implemented in Rust.
 #[pymodule]
 fn fastwalk(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(walk, m)?)?;
