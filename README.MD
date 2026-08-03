@@ -14,3 +14,6 @@ for path in walk_parallel("/"):
    print(path.name)
 
 ```
+
+BUILD:
+LIBRARY_PATH=~/.local/lib:$LIBRARY_PATH LD_LIBRARY_PATH=~/.local/lib:$LD_LIBRARY_PATH RUSTFLAGS="-L ~/.local/lib" python -m maturin build --verbose
