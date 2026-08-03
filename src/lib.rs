@@ -1,17 +1,50 @@
 use pyo3::exceptions::PyOSError;
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyString};
 use std::path::PathBuf;
 
+// Helper function to convert PathBuf to Python Path object
 fn to_py_path<'py>(py: Python<'py>, path: PathBuf) -> PyResult<&'py PyAny> {
     let pathlib = py.import("pathlib")?;
     pathlib.call_method1("Path", (path,))
 }
 
+// Custom type that accepts both Path and str
+#[derive(Clone)]
+struct PathInput(PathBuf);
+
+impl<'py> FromPyObject<'py> for PathInput {
+    fn extract(obj: &'py PyAny) -> PyResult<Self> {
+        // If it's a string, convert to PathBuf
+        if let Ok(s) = obj.extract::<String>() {
+            return Ok(PathInput(PathBuf::from(s)));
+        }
+        
+        // If it's a Path object, extract the string representation
+        if let Ok(path_str) = obj.call_method0("__str__") {
+            if let Ok(s) = path_str.extract::<String>() {
+                return Ok(PathInput(PathBuf::from(s)));
+            }
+        }
+        
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "Expected a string or pathlib.Path object",
+        ))
+    }
+}
+
+// Helper function to convert PathInput to PathBuf
+impl From<PathInput> for PathBuf {
+    fn from(input: PathInput) -> Self {
+        input.0
+    }
+}
+
 #[pyfunction]
-fn walk(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
+fn walk(py: Python<'_>, path: PathInput, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
-    let walker = jwalk::WalkDir::new(&path).follow_links(follow);
+    let path_buf: PathBuf = path.into();
+    let walker = jwalk::WalkDir::new(&path_buf).follow_links(follow);
     let mut results = Vec::new();
 
     for entry in walker {
@@ -31,9 +64,10 @@ fn walk(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<V
 }
 
 #[pyfunction]
-fn walk_files(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
+fn walk_files(py: Python<'_>, path: PathInput, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
-    let walker = jwalk::WalkDir::new(&path).follow_links(follow);
+    let path_buf: PathBuf = path.into();
+    let walker = jwalk::WalkDir::new(&path_buf).follow_links(follow);
     let mut results = Vec::new();
 
     for entry in walker {
@@ -55,9 +89,10 @@ fn walk_files(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyRe
 }
 
 #[pyfunction]
-fn walk_dirs(py: Python<'_>, path: PathBuf, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
+fn walk_dirs(py: Python<'_>, path: PathInput, follow_links: Option<bool>) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
-    let walker = jwalk::WalkDir::new(&path).follow_links(follow);
+    let path_buf: PathBuf = path.into();
+    let walker = jwalk::WalkDir::new(&path_buf).follow_links(follow);
     let mut results = Vec::new();
 
     for entry in walker {
@@ -96,13 +131,14 @@ struct Entry {
 #[pyfunction]
 fn walk_with_metadata(
     py: Python<'_>,
-    path: PathBuf,
+    path: PathInput,
     follow_links: Option<bool>,
     max_depth: Option<usize>,
     min_depth: Option<usize>,
 ) -> PyResult<Vec<Entry>> {
     let follow = follow_links.unwrap_or(false);
-    let mut walker = jwalk::WalkDir::new(&path).follow_links(follow);
+    let path_buf: PathBuf = path.into();
+    let mut walker = jwalk::WalkDir::new(&path_buf).follow_links(follow);
 
     if let Some(max) = max_depth {
         walker = walker.max_depth(max);
@@ -140,14 +176,15 @@ fn walk_with_metadata(
 #[pyfunction]
 fn walk_parallel(
     py: Python<'_>,
-    path: PathBuf,
+    path: PathInput,
     follow_links: Option<bool>,
     num_threads: Option<usize>,
 ) -> PyResult<Vec<&PyAny>> {
     let follow = follow_links.unwrap_or(false);
+    let path_buf: PathBuf = path.into();
     let threads = num_threads.unwrap_or(0); // 0 = auto
 
-    let walker = jwalk::WalkDir::new(&path)
+    let walker = jwalk::WalkDir::new(&path_buf)
         .follow_links(follow)
         .parallelism(jwalk::Parallelism::RayonNewPool(threads));
 
